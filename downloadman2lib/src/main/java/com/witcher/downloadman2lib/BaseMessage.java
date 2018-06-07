@@ -7,6 +7,17 @@ public class BaseMessage {
         this.tid = tid;
     }
 
+    public static class PauseMessage extends BaseMessage{
+        public long current;
+        public long total;
+
+        public PauseMessage(int tid, long current,long total) {
+            super(tid);
+            this.current = current;
+            this.total = total;
+        }
+    }
+
     public static class ProgressMessage extends BaseMessage {
         public long total;
         public long current;

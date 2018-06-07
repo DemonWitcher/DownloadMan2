@@ -157,9 +157,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         @Override
-        public void onPause(int tid) {
+        public void onPause(int tid,long current, long total) {
             L.w("onPause tid:" + tid);
             mTvState.setText("暂停中");
+            mTvCurrent.setText(Util.formatSize(current));
+            mTvTotal.setText(Util.formatSize(total));
+            mPbProgress.setProgress(Util.formatPercentInt(total, current));
         }
 
         @Override

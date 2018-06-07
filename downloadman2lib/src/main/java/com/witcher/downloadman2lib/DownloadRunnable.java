@@ -40,8 +40,15 @@ public class DownloadRunnable implements Runnable {
 
     public void pause() {
         L.i("rid:" + range.getIdkey() + " 暂停");
-        dbManager.updateRange(range);
         isPause = true;
+    }
+
+    public Range getRange() {
+        return range;
+    }
+
+    public Task getTask() {
+        return task;
     }
 
     @Override
@@ -96,6 +103,8 @@ public class DownloadRunnable implements Runnable {
                     L.i("rid:" + range.getIdkey() + ",progress:" + range.getCurrent());
                 }
                 if (isPause) {
+                    outputStream.flush();
+                    dbManager.updateRange(range);//这次更新的数据 和暂停回调给的数据 不一致
                     break;
                 }
             }

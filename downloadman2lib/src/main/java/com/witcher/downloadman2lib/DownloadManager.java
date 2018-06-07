@@ -83,7 +83,7 @@ public class DownloadManager {
                 File taskFile = new File(path);
                 if (task == null) {
                     L.i("新任务");
-                    task = new Task(url, path, taskFile.getName(), tid, RANGER_NUMBER,length);
+                    task = new Task(url, path, taskFile.getName(), tid, RANGER_NUMBER, length);
                     prepare(length, taskFile, task);
                     startDownloadRunnable(task);
                 } else {
@@ -143,6 +143,7 @@ public class DownloadManager {
         downloadMap.put(task.getTid(), runnableList);
         try {
             executor.invokeAll(subTasks);
+            L.i("executor.invokeAll(subTasks); 的下一行");
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -179,15 +180,20 @@ public class DownloadManager {
     }
 
     public void pause(int tid) {
-        List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
-        if (downloadRunnableList != null) {
-            for (DownloadRunnable downloadRunnable : downloadRunnableList) {
-                downloadRunnable.pause();
-            }
-        }
         try {
+            long current = 0;
+            long total = 0;
+            List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
+            if (downloadRunnableList != null) {
+                for (DownloadRunnable downloadRunnable : downloadRunnableList) {
+                    downloadRunnable.pause();
+                    current = downloadRunnable.getRange().getCurrent() + current;
+                    L.i("rid:"+downloadRunnable.getRange().getIdkey()+" current:"+current);
+                    total = downloadRunnable.getTask().getTotal();
+                }
+            }
             for (IDownloadCallback downloadCallback : callbackList) {
-                downloadCallback.onPause(tid);
+                downloadCallback.onPause(tid,current,total);
             }
         } catch (RemoteException e) {
             e.printStackTrace();

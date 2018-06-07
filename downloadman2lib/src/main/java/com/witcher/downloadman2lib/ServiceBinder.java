@@ -14,6 +14,7 @@ import com.witcher.downloadman2lib.BaseMessage.Type;
 import com.witcher.downloadman2lib.BaseMessage.ProgressMessage;
 import com.witcher.downloadman2lib.BaseMessage.ErrorMessage;
 import com.witcher.downloadman2lib.BaseMessage.CompleteMessage;
+import com.witcher.downloadman2lib.BaseMessage.PauseMessage;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -45,10 +46,10 @@ public class ServiceBinder {
                 }
                 break;
                 case Type.PAUSE: {
-                    int tid = (int) msg.obj;
-                    DownloadListener downloadListener = listenerMap.get(tid);
+                    PauseMessage pauseMessage = (PauseMessage) msg.obj;
+                    DownloadListener downloadListener = listenerMap.get(pauseMessage.tid);
                     if (downloadListener != null) {
-                        downloadListener.onPause(tid);
+                        downloadListener.onPause(pauseMessage.tid,pauseMessage.current,pauseMessage.total);
                     }
                 }
                 break;
@@ -100,8 +101,8 @@ public class ServiceBinder {
         }
 
         @Override
-        public void onPause(int tid) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.PAUSE, tid));
+        public void onPause(int tid,long current, long total) throws RemoteException {
+            handler.sendMessage(Message.obtain(handler, Type.PAUSE, new PauseMessage(tid,current,total)));
         }
 
         @Override
