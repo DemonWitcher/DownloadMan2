@@ -68,7 +68,10 @@ public class DownloadMan {
         }
     }
 
-    public static Task sel(int tid) {
+    public static Task selAllTask() {
+        if(serviceBinder!=null){
+//            serviceBinder.delete(tid);
+        }
         return null;
     }
 }

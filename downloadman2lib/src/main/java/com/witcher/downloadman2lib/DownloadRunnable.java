@@ -115,6 +115,7 @@ public class DownloadRunnable implements Runnable {
                     L.i("rid:" + range.getIdkey() + "下载成功");
                     range.setState(State.COMPLETED);
                     dbManager.updateRange(range);
+
                     List<Range> rangeList = task.getRanges();
                     boolean isCompleted = true;
                     for (Range range : rangeList) {
@@ -123,6 +124,8 @@ public class DownloadRunnable implements Runnable {
                         }
                     }
                     if (isCompleted) {
+                        task.setCurrent(task.getTotal());
+                        dbManager.updateTask(task);
                         for (IDownloadCallback downloadCallback : callbackList) {
                             downloadCallback.onCompleted(task.getTid(),task.getTotal());
                         }

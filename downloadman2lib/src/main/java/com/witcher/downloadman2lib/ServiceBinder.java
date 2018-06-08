@@ -9,21 +9,19 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
+import android.util.SparseArray;
 
-import com.witcher.downloadman2lib.BaseMessage.Type;
-import com.witcher.downloadman2lib.BaseMessage.ProgressMessage;
-import com.witcher.downloadman2lib.BaseMessage.ErrorMessage;
 import com.witcher.downloadman2lib.BaseMessage.CompleteMessage;
+import com.witcher.downloadman2lib.BaseMessage.ErrorMessage;
 import com.witcher.downloadman2lib.BaseMessage.PauseMessage;
-
-import java.util.HashMap;
-import java.util.Map;
+import com.witcher.downloadman2lib.BaseMessage.ProgressMessage;
+import com.witcher.downloadman2lib.BaseMessage.Type;
 
 public class ServiceBinder {
 
     private IDownloadService mIDownloadService;
     private boolean mIsBind;
-    private Map<Integer, DownloadListener> listenerMap;
+    private SparseArray<DownloadListener> listenerMap;
     private Handler handler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
@@ -131,7 +129,7 @@ public class ServiceBinder {
         public void onServiceConnected(ComponentName name, IBinder service) {
             mIDownloadService = IDownloadService.Stub.asInterface(service);
             mIsBind = true;
-            listenerMap = new HashMap<>();
+            listenerMap = new SparseArray<>();
             try {
                 mIDownloadService.registerCallback(mIDownloadCallback);
             } catch (RemoteException e) {
