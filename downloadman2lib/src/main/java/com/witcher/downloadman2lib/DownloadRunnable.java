@@ -102,9 +102,11 @@ public class DownloadRunnable implements Runnable {
                     dbManager.updateRange(range);
                     L.i("rid:" + range.getIdkey() + ",progress:" + range.getCurrent());
                 }
+//                L.i("写入了一次 rid:"+range.getIdkey()+"progress:"+range.getCurrent());
                 if (isPause) {
                     outputStream.flush();
-                    dbManager.updateRange(range);//这次更新的数据 和暂停回调给的数据 不一致
+                    range.setCurrent(range.getCurrent() - byteCount);
+                    dbManager.updateRange(range);//暂停回调给完后 下载线程还能再写入一次数据
                     break;
                 }
             }
@@ -112,7 +114,6 @@ public class DownloadRunnable implements Runnable {
                 if (response.isSuccessful()) {
                     L.i("rid:" + range.getIdkey() + "下载成功");
                     range.setState(State.COMPLETED);
-                    range.setCurrent(range.getEnd() - range.getStart());
                     dbManager.updateRange(range);
                     List<Range> rangeList = task.getRanges();
                     boolean isCompleted = true;

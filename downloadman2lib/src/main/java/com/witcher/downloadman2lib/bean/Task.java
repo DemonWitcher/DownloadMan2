@@ -153,6 +153,10 @@ public class Task {
     public String toString() {
         return "Task{" +
                 "tid=" + tid +
+                ", fileName='" + fileName + '\'' +
+                ", state=" + state +
+                ", total=" + total +
+                ", current=" + current +
                 '}';
     }
 }

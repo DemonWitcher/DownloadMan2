@@ -55,59 +55,9 @@ public class DownloadManager {
         dbManager.close();
     }
 
-    //函数1
     public void start(String url, String path) {
-        //4.查询本地是否存在
-        //	5.第一次连接 拿长度,是否支持range,拿eTag
-        //6.本地不存在  检查本地磁盘空间 创建文件 插入TASK 任务分区 插入RANGE,,走线程池 开始下载
-        //		7.本地存在,eTag没过期,读取分区数据 检查本地文件
-        //			如果文件存在 下载进度 开始下载
-        //			如果文件不存在 走步骤8
-        //		8.本地存在,eTag过期,删除本地文件,清理数据库,然后走步骤6
         int tid = Util.generateId(url, path);
-        try {
-            for (IDownloadCallback downloadCallback : callbackList) {
-                downloadCallback.onConnected(tid);
-            }
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-        Call<Void> call = api.getHttpHeader(url);
-        try {
-            Response<Void> response = call.execute();
-            if (response.isSuccessful()) {
-                long length = Long.valueOf(response.headers().get("Content-Length"));
-                String etag = response.headers().get("etag");
-                L.i("length:" + length);
-                Task task = dbManager.selTask(tid);
-                File taskFile = new File(path);
-                if (task == null) {
-                    L.i("新任务");
-                    task = new Task(url, path, taskFile.getName(), tid, RANGER_NUMBER, length);
-                    prepare(length, taskFile, task);
-                    startDownloadRunnable(task);
-                } else {
-                    if (taskFile.exists()) {
-                        //继续下载 读取数据库分区数据 继续下载 这里后面在加上校验etag或者lastModify
-                        L.i("继续下载");
-                        List<Range> rangeList = dbManager.selRange(tid);
-                        task.setRanges(rangeList);
-                        startDownloadRunnable(task);
-                    } else {
-                        L.i("文件不存在 重新下载");
-                        dbManager.delete(tid);
-                        prepare(length, taskFile, task);
-                        startDownloadRunnable(task);
-                    }
-                }
-            } else {
-                L.i("网络请求失败 message:" + response.message());
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        }
+        executor.execute(new FirstConnection(url, path, tid));
     }
 
     private void createRange(Task task, long length) {
@@ -143,7 +93,6 @@ public class DownloadManager {
         downloadMap.put(task.getTid(), runnableList);
         try {
             executor.invokeAll(subTasks);
-            L.i("executor.invokeAll(subTasks); 的下一行");
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -188,12 +137,12 @@ public class DownloadManager {
                 for (DownloadRunnable downloadRunnable : downloadRunnableList) {
                     downloadRunnable.pause();
                     current = downloadRunnable.getRange().getCurrent() + current;
-                    L.i("rid:"+downloadRunnable.getRange().getIdkey()+" current:"+current);
+                    L.i("暂停了 rid:" + downloadRunnable.getRange().getIdkey() + " current:" + downloadRunnable.getRange().getCurrent());
                     total = downloadRunnable.getTask().getTotal();
                 }
             }
             for (IDownloadCallback downloadCallback : callbackList) {
-                downloadCallback.onPause(tid,current,total);
+                downloadCallback.onPause(tid, current, total);
             }
         } catch (RemoteException e) {
             e.printStackTrace();
@@ -221,6 +170,66 @@ public class DownloadManager {
             }
         } catch (RemoteException e) {
             e.printStackTrace();
+        }
+    }
+
+    private class FirstConnection implements Runnable {
+
+        private String url;
+        private String path;
+        private int tid;
+
+        public FirstConnection(String url, String path, int tid) {
+            this.url = url;
+            this.path = path;
+            this.tid = tid;
+        }
+
+        @Override
+        public void run() {
+            try {
+                for (IDownloadCallback downloadCallback : callbackList) {
+                    downloadCallback.onConnected(tid);
+                }
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
+            Call<Void> call = api.getHttpHeader(url);
+            try {
+                Response<Void> response = call.execute();
+                if (response.isSuccessful()) {
+                    long length = Long.valueOf(response.headers().get("Content-Length"));
+                    String etag = response.headers().get("etag");
+                    L.i("length:" + length);
+                    Task task = dbManager.selTask(tid);
+                    File taskFile = new File(path);
+                    if (task == null) {
+                        L.i("新任务");
+                        task = new Task(url, path, taskFile.getName(), tid, RANGER_NUMBER, length);
+                        prepare(length, taskFile, task);
+                        startDownloadRunnable(task);
+                    } else {
+                        if (taskFile.exists()) {
+                            //继续下载 读取数据库分区数据 继续下载 这里后面在加上校验etag或者lastModify
+                            L.i("继续下载");
+                            List<Range> rangeList = dbManager.selRange(tid);
+                            task.setRanges(rangeList);
+                            startDownloadRunnable(task);
+                        } else {
+                            L.i("文件不存在 重新下载");
+                            dbManager.delete(tid);
+                            prepare(length, taskFile, task);
+                            startDownloadRunnable(task);
+                        }
+                    }
+                } else {
+                    L.i("网络请求失败 message:" + response.message());
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+            }
         }
     }
 }

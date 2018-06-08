@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mTvState.setText("暂停中");
                 mPbProgress.setProgress(Util.formatPercentInt(task.getTotal(), task.getCurrent()));
             }
-            L.i("查询出来的TID :" + tid);
+            L.i("查询出来的task :" + task.toString());
         }
     }
 
