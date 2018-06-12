@@ -48,7 +48,7 @@ public class DownloadManager {
 
     public void start(String url, String path) {
         int tid = Util.generateId(url, path);
-        FirstConnection firstConnection = new FirstConnection(url,path,tid,executor,dbManager,callbackList,downloadMap);
+        FirstConnection firstConnection = new FirstConnection(url,path,tid,executor,dbManager,callbackList,downloadMap,connectionMap);
         connectionMap.put(tid,firstConnection);
         executor.execute(firstConnection);
         //AIDL接口线程 ->准备线程->下载线程
@@ -66,14 +66,15 @@ public class DownloadManager {
                 long[] totalAndCurrent = firstConnection.getTotalAndCurrent();
                 total = totalAndCurrent[0];
                 current = totalAndCurrent[1];
-            }
-            List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
-            if (downloadRunnableList != null) {
-                for (DownloadRunnable downloadRunnable : downloadRunnableList) {
-                    downloadRunnable.pause();
-                    current = downloadRunnable.getRange().getCurrent() + current;
-                    L.i("暂停了 rid:" + downloadRunnable.getRange().getIdkey() + " current:" + downloadRunnable.getRange().getCurrent());
-                    total = downloadRunnable.getTask().getTotal();
+            }else{
+                List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
+                if (downloadRunnableList != null) {
+                    for (DownloadRunnable downloadRunnable : downloadRunnableList) {
+                        downloadRunnable.pause();
+                        current = downloadRunnable.getRange().getCurrent() + current;
+                        L.i("暂停了 rid:" + downloadRunnable.getRange().getIdkey() + " current:" + downloadRunnable.getRange().getCurrent());
+                        total = downloadRunnable.getTask().getTotal();
+                    }
                 }
             }
             MessageSnapshot.PauseMessageSnapshot pauseMessageSnapshot =
@@ -87,12 +88,18 @@ public class DownloadManager {
     }
 
     public void delete(int tid) {
+        FirstConnection firstConnection = connectionMap.get(tid);
+        if(firstConnection!=null){
+            firstConnection.pause();//下载线程暂停了 给内存里的数据 准备线程暂停了 给数据库里的数据
+        }
+        connectionMap.remove(tid);
         List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
         if (downloadRunnableList != null) {
             for (DownloadRunnable downloadRunnable : downloadRunnableList) {
                 downloadRunnable.pause();
             }
         }
+        downloadMap.remove(tid);
 
         Task task = dbManager.delete(tid);
         if (task != null) {

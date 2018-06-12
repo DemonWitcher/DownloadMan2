@@ -31,10 +31,12 @@ public class FirstConnection implements Runnable{
     private ThreadPoolExecutor executor;
     private DBManager dbManager;
     private Map<Integer, List<DownloadRunnable>> downloadMap;
+    private Map<Integer,FirstConnection> connectionMap;
     private List<IDownloadCallback> callbackList;
 
     public FirstConnection(String url, String path, int tid, ThreadPoolExecutor executor, DBManager dbManager,
-                           List<IDownloadCallback> callbackList,Map<Integer, List<DownloadRunnable>> downloadMap) {
+                           List<IDownloadCallback> callbackList,Map<Integer, List<DownloadRunnable>> downloadMap
+                            ,Map<Integer,FirstConnection> connectionMap) {
         this.url = url;
         this.path = path;
         this.tid = tid;
@@ -43,6 +45,7 @@ public class FirstConnection implements Runnable{
         this.dbManager = dbManager;
         this.downloadMap = downloadMap;
         this.callbackList = callbackList;
+        this.connectionMap = connectionMap;
         //最好对外提供task的total和current
     }
 
@@ -73,13 +76,6 @@ public class FirstConnection implements Runnable{
         try {
             MessageSnapshot messageSnapshot = new MessageSnapshot(tid,MessageType.CONNECTED);
             for (IDownloadCallback downloadCallback : callbackList) {
-//                try {
-//                    L.i("连接中睡眠开始");
-//                    Thread.sleep(5000);
-//                    L.i("连接中睡眠结束");
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
                 if(isPause){
                     return;
                 }
@@ -129,6 +125,8 @@ public class FirstConnection implements Runnable{
             e.printStackTrace();
         } catch (NumberFormatException e) {
             e.printStackTrace();
+        }finally {
+            connectionMap.remove(tid);
         }
     }
 
@@ -138,12 +136,13 @@ public class FirstConnection implements Runnable{
         for (int i = 0; i < task.getRanges().size(); ++i) {
             Range range = task.getRanges().get(i);
             range.setState(State.PREPARE);
-            DownloadRunnable downloadRunnable = new DownloadRunnable(range, task, dbManager, callbackList);
+            DownloadRunnable downloadRunnable = new DownloadRunnable(range, task, dbManager, callbackList,downloadMap);
             runnableList.add(downloadRunnable);
             subTasks.add(Executors.callable(downloadRunnable));
         }
         downloadMap.put(task.getTid(), runnableList);
         try {
+            connectionMap.remove(tid);
             if(isPause){
                 return;
             }

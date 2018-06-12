@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.ResponseBody;
 import retrofit2.Call;
@@ -29,13 +30,16 @@ public class DownloadRunnable implements Runnable {
     private volatile boolean isPause;
     private DBManager dbManager;
     private List<IDownloadCallback> callbackList;
+    private Map<Integer, List<DownloadRunnable>> downloadMap;
 
-    public DownloadRunnable(Range range, Task task, DBManager dbManager, List<IDownloadCallback> callbackList) {
+    public DownloadRunnable(Range range, Task task, DBManager dbManager, List<IDownloadCallback> callbackList
+    ,Map<Integer, List<DownloadRunnable>> downloadMap) {
         this.range = range;
         this.task = task;
         api = RetrofitProvider.getInstance().create(API.class);
         this.dbManager = dbManager;
         this.callbackList = callbackList;
+        this.downloadMap = downloadMap;
     }
 
     public void pause() {
@@ -168,6 +172,7 @@ public class DownloadRunnable implements Runnable {
                     e.printStackTrace();
                 }
             }
+            downloadMap.remove(task.getTid());
         }
     }
 }
