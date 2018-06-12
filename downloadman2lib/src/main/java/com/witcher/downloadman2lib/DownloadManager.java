@@ -52,8 +52,19 @@ public class DownloadManager {
         connectionMap.put(tid,firstConnection);
         executor.execute(firstConnection);
         //AIDL接口线程 ->准备线程->下载线程
-        //现在连接中的状态 无法暂停
-        //完成了的任务得从map里remove出去
+        //开始下载
+        /*
+            主进程UI->AIDL接口线程->创建准备线程->加入map->执行准备线程->连接中回调->第一次连接->
+            检测数据库和本地文件->创建下载线程->加入map->执行下载线程->网络连接->IO|数据库|回调->数据库->完成回调
+         */
+        //暂停
+        /*
+            主进程UI->AIDL接口线程->读map暂停准备线程->读map暂停下载线程|下载线程记录进度->暂停回调
+         */
+        //删除
+        /*
+            主进程UI->AIDL接口线程->读map暂停准备线程|删除map->读map暂停下载线程|删除map->数据库|IO->删除回调
+         */
     }
 
     public void pause(int tid) {

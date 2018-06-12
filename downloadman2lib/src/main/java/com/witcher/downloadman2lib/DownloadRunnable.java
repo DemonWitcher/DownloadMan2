@@ -63,7 +63,7 @@ public class DownloadRunnable implements Runnable {
         BufferedOutputStream outputStream = null;
         try {
             String strRange = "bytes=" + (range.getCurrent() + range.getStart()) + "-" + range.getEnd();
-
+            L.i("rid:"+range.getIdkey()+"strRange :"+strRange);
             Call<ResponseBody> call = api.download(strRange, task.getUrl());
             Response<ResponseBody> response = call.execute();
 
@@ -81,6 +81,9 @@ public class DownloadRunnable implements Runnable {
             MessageSnapshot startMessageSnapshot = new MessageSnapshot(task.getTid(),MessageType.START);
             for (IDownloadCallback downloadCallback : callbackList) {
                 downloadCallback.callback(startMessageSnapshot);
+            }
+            if (isPause) {
+                return;
             }
             while (true) {
                 byteCount = inputStream.read(bytes);
