@@ -158,7 +158,7 @@ public class SingleTaskActivity extends AppCompatActivity implements View.OnClic
 
         @Override
         public void onPause(int tid,long current, long total) {
-            L.w("onPause tid:" + tid);
+            L.w("onPause tid:" + tid+",current:"+current+",total:"+total);
             mTvState.setText("暂停中");
             mTvCurrent.setText(Util.formatSize(current));
             mTvTotal.setText(Util.formatSize(total));

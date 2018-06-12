@@ -11,11 +11,10 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.util.SparseArray;
 
-import com.witcher.downloadman2lib.BaseMessage.CompleteMessage;
-import com.witcher.downloadman2lib.BaseMessage.ErrorMessage;
-import com.witcher.downloadman2lib.BaseMessage.PauseMessage;
-import com.witcher.downloadman2lib.BaseMessage.ProgressMessage;
-import com.witcher.downloadman2lib.BaseMessage.Type;
+import com.witcher.downloadman2lib.MessageSnapshot.ErrorMessageSnapshot;
+import com.witcher.downloadman2lib.MessageSnapshot.ProgressMessageSnapshot;
+import com.witcher.downloadman2lib.MessageSnapshot.PauseMessageSnapshot;
+import com.witcher.downloadman2lib.MessageSnapshot.CompleteMessageSnapshot;
 
 public class ServiceBinder {
 
@@ -26,57 +25,55 @@ public class ServiceBinder {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
-            switch (msg.what) {
-                case Type.PROGRESS: {
-                    ProgressMessage progressMessage = (ProgressMessage) msg.obj;
+            MessageSnapshot messageSnapshot = (MessageSnapshot) msg.obj;
+            switch (messageSnapshot.type) {
+                case MessageType.PROGRESS: {
+                    ProgressMessageSnapshot progressMessage = (ProgressMessageSnapshot) msg.obj;
                     DownloadListener downloadListener = listenerMap.get(progressMessage.tid);
                     if (downloadListener != null) {
                         downloadListener.onProgress(progressMessage.tid, progressMessage.current, progressMessage.total);
                     }
                 }
                 break;
-                case Type.COMPLETED: {
-                    CompleteMessage completeMessage = (CompleteMessage) msg.obj;
+                case MessageType.COMPLETED: {
+                    CompleteMessageSnapshot completeMessage = (CompleteMessageSnapshot) msg.obj;
                     DownloadListener downloadListener = listenerMap.get(completeMessage.tid);
                     if (downloadListener != null) {
                         downloadListener.onCompleted(completeMessage.tid,completeMessage.total);
                     }
                 }
                 break;
-                case Type.PAUSE: {
-                    PauseMessage pauseMessage = (PauseMessage) msg.obj;
+                case MessageType.PAUSE: {
+                    PauseMessageSnapshot pauseMessage = (PauseMessageSnapshot) msg.obj;
                     DownloadListener downloadListener = listenerMap.get(pauseMessage.tid);
                     if (downloadListener != null) {
                         downloadListener.onPause(pauseMessage.tid,pauseMessage.current,pauseMessage.total);
                     }
                 }
                 break;
-                case Type.START: {
-                    int tid = (int) msg.obj;
-                    DownloadListener downloadListener = listenerMap.get(tid);
+                case MessageType.START: {
+                    DownloadListener downloadListener = listenerMap.get(messageSnapshot.tid);
                     if (downloadListener != null) {
-                        downloadListener.onStart(tid);
+                        downloadListener.onStart(messageSnapshot.tid);
                     }
                 }
                 break;
-                case Type.DELETE: {
-                    int tid = (int) msg.obj;
-                    DownloadListener downloadListener = listenerMap.get(tid);
+                case MessageType.DELETE: {
+                    DownloadListener downloadListener = listenerMap.get(messageSnapshot.tid);
                     if (downloadListener != null) {
-                        downloadListener.onDelete(tid);
+                        downloadListener.onDelete(messageSnapshot.tid);
                     }
                 }
                 break;
-                case Type.CONNECTED: {
-                    int tid = (int) msg.obj;
-                    DownloadListener downloadListener = listenerMap.get(tid);
+                case MessageType.CONNECTED: {
+                    DownloadListener downloadListener = listenerMap.get(messageSnapshot.tid);
                     if (downloadListener != null) {
-                        downloadListener.onConnected(tid);
+                        downloadListener.onConnected(messageSnapshot.tid);
                     }
                 }
                 break;
-                case Type.ERROR: {
-                    ErrorMessage errorMessage = (ErrorMessage) msg.obj;
+                case MessageType.ERROR: {
+                    ErrorMessageSnapshot errorMessage = (ErrorMessageSnapshot) msg.obj;
                     DownloadListener downloadListener = listenerMap.get(errorMessage.tid);
                     if (downloadListener != null) {
 //                      downloadListener.onError(tid);
@@ -89,39 +86,10 @@ public class ServiceBinder {
 
     private IDownloadCallback.Stub mIDownloadCallback = new IDownloadCallback.Stub() {
         @Override
-        public void onProgress(int tid, long current, long total) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.PROGRESS, new ProgressMessage(tid, total, current)));
+        public void callback(MessageSnapshot messageSnapshot) throws RemoteException {
+            handler.sendMessage(handler.obtainMessage(0,messageSnapshot));
         }
 
-        @Override
-        public void onCompleted(int tid,long total) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.COMPLETED, new CompleteMessage(tid,total)));
-        }
-
-        @Override
-        public void onPause(int tid,long current, long total) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.PAUSE, new PauseMessage(tid,current,total)));
-        }
-
-        @Override
-        public void onStart(int tid) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.START, tid));
-        }
-
-        @Override
-        public void onConnected(int tid) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.CONNECTED, tid));
-        }
-
-        @Override
-        public void onDelete(int tid) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.DELETE, tid));
-        }
-
-        @Override
-        public void onError(int tid, int code, String message) throws RemoteException {
-            handler.sendMessage(Message.obtain(handler, Type.ERROR, new ErrorMessage(tid, code, message)));
-        }
     };
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -139,10 +107,12 @@ public class ServiceBinder {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            try {
-                mIDownloadService.unregisterCallback(mIDownloadCallback);
-            } catch (RemoteException e) {
-                e.printStackTrace();
+            if(mIDownloadService!=null && mIsBind){
+                try {
+                    mIDownloadService.unregisterCallback(mIDownloadCallback);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
             }
             mIDownloadService = null;
             mIsBind = false;

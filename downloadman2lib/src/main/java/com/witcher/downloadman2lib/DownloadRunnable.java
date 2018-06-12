@@ -59,7 +59,6 @@ public class DownloadRunnable implements Runnable {
         BufferedOutputStream outputStream = null;
         try {
             String strRange = "bytes=" + (range.getCurrent() + range.getStart()) + "-" + range.getEnd();
-            L.i("rid:" + range.getIdkey() + ",strRange:" + strRange + ",current:" + range.getCurrent() + ",start:" + range.getStart());
 
             Call<ResponseBody> call = api.download(strRange, task.getUrl());
             Response<ResponseBody> response = call.execute();
@@ -68,8 +67,6 @@ public class DownloadRunnable implements Runnable {
             raf = new RandomAccessFile(new File(task.getPath()), "rw");
             outputStream = new BufferedOutputStream(new FileOutputStream(raf.getFD()));
 
-            L.i("rid:" + range.getIdkey() + ",seek:" + (range.getStart() + range.getCurrent()));
-
             raf.seek(range.getStart() + range.getCurrent());
 
             byte[] bytes = new byte[BUFFER_SIZE];
@@ -77,8 +74,9 @@ public class DownloadRunnable implements Runnable {
 
             L.i("rid:" + range.getIdkey() + ",开始下载");
             range.setState(State.DOWNLOADING);
+            MessageSnapshot startMessageSnapshot = new MessageSnapshot(task.getTid(),MessageType.START);
             for (IDownloadCallback downloadCallback : callbackList) {
-                downloadCallback.onStart(task.getTid());
+                downloadCallback.callback(startMessageSnapshot);
             }
             while (true) {
                 byteCount = inputStream.read(bytes);
@@ -94,12 +92,17 @@ public class DownloadRunnable implements Runnable {
                     for (Range range : task.getRanges()) {
                         allCurrent = allCurrent + range.getCurrent();
                     }
-                    downloadCallback.onProgress(task.getTid(), allCurrent, task.getTotal());
+                    MessageSnapshot.ProgressMessageSnapshot progressMessageSnapshot =
+                            new MessageSnapshot.PauseMessageSnapshot(task.getTid(),MessageType.PROGRESS,
+                                    task.getTotal(),allCurrent);
+                    downloadCallback.callback(progressMessageSnapshot);
                 }
                 if (currentTime - lastTime > 2000) {
-                    lastTime = currentTime;
-                    outputStream.flush();
-                    dbManager.updateRange(range);
+                    if(!isPause){
+                        lastTime = currentTime;
+                        outputStream.flush();
+                        dbManager.updateRange(range);
+                    }
                     L.i("rid:" + range.getIdkey() + ",progress:" + range.getCurrent());
                 }
 //                L.i("写入了一次 rid:"+range.getIdkey()+"progress:"+range.getCurrent());
@@ -126,8 +129,11 @@ public class DownloadRunnable implements Runnable {
                     if (isCompleted) {
                         task.setCurrent(task.getTotal());
                         dbManager.updateTask(task);
+                        MessageSnapshot.CompleteMessageSnapshot completeMessageSnapshot =
+                                new MessageSnapshot.CompleteMessageSnapshot(task.getTid(),MessageType.COMPLETED,
+                                        task.getTotal());
                         for (IDownloadCallback downloadCallback : callbackList) {
-                            downloadCallback.onCompleted(task.getTid(),task.getTotal());
+                            downloadCallback.callback(completeMessageSnapshot);
                         }
                     }
                 } else {

@@ -53,7 +53,7 @@ public class DBManager {
     }
 
     public void updateRange(Range range) {
-        L.d("修改数据库 range "+range.toString());
+        L.d("修改数据库 range " + range.toString());
         mDaoSession.getRangeDao().update(range);
     }
 
@@ -64,8 +64,8 @@ public class DBManager {
     public List<Range> selRange(int tid) {
         QueryBuilder<Range> queryBuilder = mDaoSession.queryBuilder(Range.class);
         List<Range> list = queryBuilder.where(RangeDao.Properties.Tid.eq(tid)).list();
-        for(Range range : list){
-            L.d("读取出来的range :"+range.toString());
+        for (Range range : list) {
+            L.d("读取出来的range :" + range.toString());
         }
         return list;
     }
@@ -74,7 +74,14 @@ public class DBManager {
         QueryBuilder<Task> queryBuilder = mDaoSession.queryBuilder(Task.class);
         List<Task> list = queryBuilder.where(TaskDao.Properties.Tid.eq(tid)).list();
         if (list.size() > 0) {
-            return list.get(0);
+            List<Range> rangeList = selRange(tid);
+            Task task = list.get(0);
+            long current = 0;
+            for (Range range : rangeList) {
+                current = range.getCurrent() + current;
+            }
+            task.setCurrent(current);
+            return task;
         } else {
             return null;
         }
@@ -83,10 +90,10 @@ public class DBManager {
     public List<Task> selAllTask() {
         List<Task> taskList = mDaoSession.getTaskDao().loadAll();
         List<Range> rangeList = mDaoSession.getRangeDao().loadAll();
-        for(Task task:taskList){
-            long current=0;
-            for(Range range:rangeList){
-                if(range.getTid() == task.getTid()){
+        for (Task task : taskList) {
+            long current = 0;
+            for (Range range : rangeList) {
+                if (range.getTid() == task.getTid()) {
                     current = range.getCurrent() + current;
                 }
             }

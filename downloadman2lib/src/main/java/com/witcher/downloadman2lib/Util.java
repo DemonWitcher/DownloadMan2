@@ -1,7 +1,10 @@
 package com.witcher.downloadman2lib;
 
+import android.app.ActivityManager;
+import android.content.Context;
 import android.os.Build;
 import android.os.StatFs;
+import android.text.TextUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
@@ -107,4 +110,40 @@ public class Util {
         int percent = (int) (result * 100);
         return percent;
     }
+
+
+    /**
+     * 判断是不是UI主进程，因为有些东西只能在UI主进程初始化
+     */
+    public static boolean isAppMainProcess(Context context) {
+        try {
+            int pid = android.os.Process.myPid();
+            String process = getAppNameByPID(context, pid);
+            if (TextUtils.isEmpty(process)) {
+                return true;
+            } else if (DownloadMan.PROCESS_NAME.equals(process)) {
+                return false;
+            } else {
+                return true;
+            }
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /**
+     * 根据Pid得到进程名
+     */
+    private static String getAppNameByPID(Context context, int pid) {
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if(manager!=null){
+            for (android.app.ActivityManager.RunningAppProcessInfo processInfo : manager.getRunningAppProcesses()) {
+                if (processInfo.pid == pid) {
+                    return processInfo.processName;
+                }
+            }
+        }
+        return "";
+    }
+
 }

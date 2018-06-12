@@ -12,6 +12,8 @@ public class DownloadMan {
     private static Context context;
     private static ServiceBinder serviceBinder;
 
+    public static final String PROCESS_NAME = "com.witcher.downloadman2:DownloadMan";
+
     /**
      * 使用application 别用activity之类的 会内存泄露
      * 现在没有懒加载 先放到application里执行这个 或者初始页之类的
@@ -20,11 +22,13 @@ public class DownloadMan {
      */
     public static void init(Context context) {
         DownloadMan.context = context;
-        if (serviceBinder == null) {
-            serviceBinder = new ServiceBinder();
-        }
-        if (!serviceBinder.isBind()) {
-            serviceBinder.bindService();
+        if(Util.isAppMainProcess(context)){
+            if (serviceBinder == null) {
+                serviceBinder = new ServiceBinder();
+            }
+            if (!serviceBinder.isBind()) {
+                serviceBinder.bindService();
+            }
         }
     }
 
