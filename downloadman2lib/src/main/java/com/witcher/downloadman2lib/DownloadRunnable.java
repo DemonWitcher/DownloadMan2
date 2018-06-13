@@ -77,9 +77,16 @@ public class DownloadRunnable implements Runnable {
             int byteCount;
 
             L.i("rid:" + range.getIdkey() + ",开始下载");
+            if(range.getState() != State.PREPARE){
+                L.e("rid:"+range.getIdkey()+"  开始下载时状态错误  当前状态:"+Util.stateToString(range.getState()));
+            }
             range.setState(State.DOWNLOADING);
             MessageSnapshot startMessageSnapshot = new MessageSnapshot(task.getTid(),MessageType.START);
             for (IDownloadCallback downloadCallback : callbackList) {
+                if (isPause) {
+                    return;
+                }
+                L.w("rid:"+range.getIdkey()+"  给出开始回调");
                 downloadCallback.callback(startMessageSnapshot);
             }
             if (isPause) {
@@ -102,6 +109,7 @@ public class DownloadRunnable implements Runnable {
                     MessageSnapshot.ProgressMessageSnapshot progressMessageSnapshot =
                             new MessageSnapshot.PauseMessageSnapshot(task.getTid(),MessageType.PROGRESS,
                                     task.getTotal(),allCurrent);
+//                    L.w("rid:"+range.getIdkey()+"  给出进度回调");
                     downloadCallback.callback(progressMessageSnapshot);
                 }
                 if (currentTime - lastTime > 2000) {
@@ -120,9 +128,14 @@ public class DownloadRunnable implements Runnable {
                     break;
                 }
             }
+            L.w( "rid:"+range.getIdkey()+"  判断是否暂停  isPause:"+isPause);
             if (!isPause) {
+                L.w("rid:"+range.getIdkey()+"  判断是否成功  isPause:"+isPause);
                 if (response.isSuccessful()) {
                     L.i("rid:" + range.getIdkey() + "下载成功");
+                    if(range.getState() != State.DOWNLOADING){
+                        L.e("rid:"+range.getIdkey()+"  完成时状态错误  当前状态:"+Util.stateToString(range.getState()));
+                    }
                     range.setState(State.COMPLETED);
                     dbManager.updateRange(range);
 
@@ -140,6 +153,7 @@ public class DownloadRunnable implements Runnable {
                                 new MessageSnapshot.CompleteMessageSnapshot(task.getTid(),MessageType.COMPLETED,
                                         task.getTotal());
                         for (IDownloadCallback downloadCallback : callbackList) {
+                            L.w("rid:"+range.getIdkey()+"  给出完成回调");
                             downloadCallback.callback(completeMessageSnapshot);
                         }
                     }
@@ -175,7 +189,12 @@ public class DownloadRunnable implements Runnable {
                     e.printStackTrace();
                 }
             }
-            downloadMap.remove(task.getTid());
+            if(isPause){
+                L.e("rid:"+range.getIdkey()+"  下载线程 完成后为暂停状态 不删除任务map");
+            }else{
+                L.e("rid:"+range.getIdkey()+"  下载线程 完成后不为暂停状态 删除任务map");
+                downloadMap.remove(task.getTid());
+            }
         }
     }
 }

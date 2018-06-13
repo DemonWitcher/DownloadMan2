@@ -25,6 +25,7 @@ public class DownloadService extends Service {
 
         @Override
         public void start(String url, String path) throws RemoteException {
+            L.i("开始任务");
             if (mDownloadManager != null) {
                 mDownloadManager.start(url, path);
             }
@@ -32,6 +33,7 @@ public class DownloadService extends Service {
 
         @Override
         public void pause(int tid) throws RemoteException {
+            L.i("暂停任务");
             if (mDownloadManager != null) {
                 mDownloadManager.pause(tid);
             }
@@ -39,6 +41,7 @@ public class DownloadService extends Service {
 
         @Override
         public void delete(int tid) throws RemoteException {
+            L.i("删除任务");
             if (mDownloadManager != null) {
                 mDownloadManager.delete(tid);
             }

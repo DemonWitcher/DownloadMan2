@@ -48,9 +48,17 @@ public class DownloadManager {
 
     public void start(String url, String path) {
         int tid = Util.generateId(url, path);
-        FirstConnection firstConnection = new FirstConnection(url,path,tid,executor,dbManager,callbackList,downloadMap,connectionMap);
-        connectionMap.put(tid,firstConnection);
-        executor.execute(firstConnection);
+        if(connectionMap.containsKey(tid)){
+            L.e("任务已经在连接中了");
+        }else{
+            if(downloadMap.containsKey(tid)){
+                L.e("任务已经在下载中了");
+            }else{
+                FirstConnection firstConnection = new FirstConnection(url,path,tid,executor,dbManager,callbackList,downloadMap,connectionMap);
+                connectionMap.put(tid,firstConnection);
+                executor.execute(firstConnection);
+            }
+        }
         //AIDL接口线程 ->准备线程->下载线程
         //开始下载
         /*
@@ -65,6 +73,20 @@ public class DownloadManager {
         /*
             主进程UI->AIDL接口线程->读map暂停准备线程|删除map->读map暂停下载线程|删除map->数据库|IO->删除回调
          */
+
+        //一个线程出错了 另外几个怎么办
+        //一个线程完成了 暂停 再开始时候 其它的继续下载 这个怎么办
+        //状态的转换 更严谨
+        //暂停中快速开始下载
+
+        /*
+            暂停了 但3个下载线程还没停住 又开始了新任务 新建了3个放map里了 然后刚才的3个停住了 把map里的删了
+            新建的3个 就不能再暂停了  连接中的也是一个道理
+            假如改成立刻删除 工作线程就不会误删其它线程
+            那任务完成后怎么删除呢  改成判断状态 是暂停就不删除 不是暂停就删除
+         */
+        //加一下接口控制 已经开始 再点开始 就什么都不做
+        //已经暂停 再点暂停 也什么都不做   删除同理
     }
 
     public void pause(int tid) {
@@ -73,6 +95,7 @@ public class DownloadManager {
             long total = 0;
             FirstConnection firstConnection = connectionMap.get(tid);
             if(firstConnection!=null){
+                connectionMap.remove(tid);
                 firstConnection.pause();//下载线程暂停了 给内存里的数据 准备线程暂停了 给数据库里的数据
                 long[] totalAndCurrent = firstConnection.getTotalAndCurrent();
                 total = totalAndCurrent[0];
@@ -80,17 +103,30 @@ public class DownloadManager {
             }else{
                 List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
                 if (downloadRunnableList != null) {
+                    downloadMap.remove(tid);
                     for (DownloadRunnable downloadRunnable : downloadRunnableList) {
                         downloadRunnable.pause();
                         current = downloadRunnable.getRange().getCurrent() + current;
                         L.i("暂停了 rid:" + downloadRunnable.getRange().getIdkey() + " current:" + downloadRunnable.getRange().getCurrent());
                         total = downloadRunnable.getTask().getTotal();
                     }
+                }else{//内存里没有这个任务 用户连续点了多次暂停就会走到这里 从数据库里读一下进度给用户吧
+                    L.e("读不到任务组 被删除了");
+                    Task task = dbManager.selTask(tid);
+                    if(task!=null){
+                        current = task.getCurrent();
+                        total = task.getTotal();
+                    }else{
+                        L.e("暂停时库里和内存中都没任务 返回了min_value作为current和total");
+                        current = Integer.MIN_VALUE;
+                        total = Integer.MIN_VALUE;
+                    }
                 }
             }
             MessageSnapshot.PauseMessageSnapshot pauseMessageSnapshot =
                     new MessageSnapshot.PauseMessageSnapshot(tid,MessageType.PAUSE,total,current);
             for (IDownloadCallback downloadCallback : callbackList) {
+                L.w("给出暂停回调");
                 downloadCallback.callback(pauseMessageSnapshot);
             }
         } catch (RemoteException e) {
@@ -122,6 +158,7 @@ public class DownloadManager {
         try {
             MessageSnapshot messageSnapshot = new MessageSnapshot(tid,MessageType.DELETE);
             for (IDownloadCallback downloadCallback : callbackList) {
+                L.w("给出删除回调");
                 downloadCallback.callback(messageSnapshot);
             }
         } catch (RemoteException e) {

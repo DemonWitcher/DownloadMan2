@@ -146,4 +146,16 @@ public class Util {
         return "";
     }
 
+    public static String stateToString(int state){
+        if(state == State.PREPARE){
+            return "准备中";
+        }else if(state == State.DOWNLOADING){
+            return "下载中";
+        }else if(state == State.COMPLETED){
+            return "已完成";
+        }else{
+            return "0 初始化";
+        }
+    }
+
 }
