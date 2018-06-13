@@ -20,23 +20,24 @@ import java.util.concurrent.ThreadPoolExecutor;
 import retrofit2.Call;
 import retrofit2.Response;
 
-public class FirstConnection implements Runnable{
+public class FirstConnection implements Runnable {
 
     private String url;
     private String path;
     private int tid;
+    private Task task;
     private volatile long length;
     private volatile boolean isPause;
     private API api;
     private ThreadPoolExecutor executor;
     private DBManager dbManager;
     private Map<Integer, List<DownloadRunnable>> downloadMap;
-    private Map<Integer,FirstConnection> connectionMap;
+    private Map<Integer, FirstConnection> connectionMap;
     private List<IDownloadCallback> callbackList;
 
     public FirstConnection(String url, String path, int tid, ThreadPoolExecutor executor, DBManager dbManager,
-                           List<IDownloadCallback> callbackList,Map<Integer, List<DownloadRunnable>> downloadMap
-                            ,Map<Integer,FirstConnection> connectionMap) {
+                           List<IDownloadCallback> callbackList, Map<Integer, List<DownloadRunnable>> downloadMap
+            , Map<Integer, FirstConnection> connectionMap) {
         this.url = url;
         this.path = path;
         this.tid = tid;
@@ -49,23 +50,23 @@ public class FirstConnection implements Runnable{
         //最好对外提供task的total和current
     }
 
-    public void pause(){
+    public void pause() {
         isPause = true;
     }
 
-    public long[] getTotalAndCurrent(){
+    public long[] getTotalAndCurrent() {
         long[] totalAndCurrent = new long[2];
         Task task = dbManager.selTask(tid);
-        if(length!=0){
+        if (length != 0) {
             totalAndCurrent[0] = length;
-        }else if(task!=null){
+        } else if (task != null) {
             totalAndCurrent[0] = task.getTotal();
-        }else{
+        } else {
             totalAndCurrent[0] = 0L;
         }
-        if(task == null){
+        if (task == null) {
             totalAndCurrent[1] = 0L;
-        }else{
+        } else {
             totalAndCurrent[1] = task.getCurrent();
         }
         return totalAndCurrent;
@@ -74,9 +75,9 @@ public class FirstConnection implements Runnable{
     @Override
     public void run() {
         try {
-            MessageSnapshot messageSnapshot = new MessageSnapshot(tid,MessageType.CONNECTED);
+            MessageSnapshot messageSnapshot = new MessageSnapshot(tid, MessageType.CONNECTED);
             for (IDownloadCallback downloadCallback : callbackList) {
-                if(isPause){
+                if (isPause) {
                     L.w("准备线程给 连接回调 前暂停");
                     return;
                 }
@@ -86,7 +87,7 @@ public class FirstConnection implements Runnable{
         } catch (RemoteException e) {
             e.printStackTrace();
         }
-        if(isPause){
+        if (isPause) {
             L.w("准备线程给 开始请求 前暂停");
             return;
         }
@@ -94,7 +95,7 @@ public class FirstConnection implements Runnable{
         try {
             L.w("准备线程 建立连接");
             Response<Void> response = call.execute();
-            if(isPause){
+            if (isPause) {
                 L.w("准备线程给 读库分区 前暂停");
                 return;
             }
@@ -103,7 +104,7 @@ public class FirstConnection implements Runnable{
                 length = Long.valueOf(response.headers().get("Content-Length"));
                 String etag = response.headers().get("etag");
                 L.i("length:" + length);
-                Task task = dbManager.selTask(tid);
+                task = dbManager.selTask(tid);
                 File taskFile = new File(path);
                 if (task == null) {
                     L.i("新任务");
@@ -131,14 +132,56 @@ public class FirstConnection implements Runnable{
             e.printStackTrace();
         } catch (NumberFormatException e) {
             e.printStackTrace();
-        }finally {
-            L.e("准备线程运行结束 isPause:"+isPause);
-//            if(isPause){
-//                L.e("准备线程 完成时为暂停状态 所以不从map中删除");
-//            }else{
-//                L.e("准备线程 完成时不是暂停状态 从map中删除");
-//                connectionMap.remove(tid);
-//            }
+        } finally {
+            L.e("准备线程运行结束 isPause:" + isPause);
+            //这里判断状态 完成 暂停 还是错误
+            if (isPause) {
+
+            } else {
+                //准备线程不是暂停状态  检测工作线程状态
+                checkResult();
+            }
+        }
+    }
+
+    private void checkResult() {
+        //有一个暂停 就应该全部是暂停  //全部都是完成 就应该是完成
+        boolean pause = true;
+        boolean completed = true;
+        List<DownloadRunnable> runnableList = downloadMap.get(tid);
+        if(runnableList == null){
+            return;
+        }
+        for (DownloadRunnable downloadRunnable : runnableList) {
+            if (!downloadRunnable.isPause) {
+                pause = false;
+            }
+            if (!downloadRunnable.isCompleted) {
+                completed = false;
+            }
+        }
+        if (pause) {
+            L.e("准备线程 完成后 所有下载线程为暂停状态 不删除任务map");
+        }else{
+            L.e("准备线程 完成后 所有下载线程不为暂停状态 删除任务map");
+            downloadMap.remove(tid);
+        }
+
+        if (completed) {
+            downloadMap.remove(tid);
+            task.setCurrent(task.getTotal());
+            dbManager.updateTask(task);
+            MessageSnapshot.CompleteMessageSnapshot completeMessageSnapshot =
+                    new MessageSnapshot.CompleteMessageSnapshot(task.getTid(), MessageType.COMPLETED,
+                            task.getTotal());
+            try {
+                for (IDownloadCallback downloadCallback : callbackList) {
+                    L.w("tid:" + tid + "  给出完成回调");
+                    downloadCallback.callback(completeMessageSnapshot);
+                }
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -147,28 +190,28 @@ public class FirstConnection implements Runnable{
         List<DownloadRunnable> runnableList = new ArrayList<>();
         for (int i = 0; i < task.getRanges().size(); ++i) {
             Range range = task.getRanges().get(i);
-            if(range.getState() == State.COMPLETED){
-                L.i("rid:"+range.getIdkey()+"  已经完成 不加入线程池了");
-            }else{
+            if (range.getState() == State.COMPLETED) {
+                L.i("rid:" + range.getIdkey() + "  已经完成 不加入线程池了");
+            } else {
                 range.setState(State.PREPARE);//这里判断range状态,如果是已经完成了的 就不修改状态并且加入线程池了
-                DownloadRunnable downloadRunnable = new DownloadRunnable(range, task, dbManager, callbackList,downloadMap);
+                DownloadRunnable downloadRunnable = new DownloadRunnable(range, task, dbManager, callbackList);
                 runnableList.add(downloadRunnable);
                 subTasks.add(Executors.callable(downloadRunnable));
             }
         }
-        if(isPause) {
+        if (isPause) {
             L.w("准备线程给 下载任务存map 前暂停");
             return;
         }
         downloadMap.put(task.getTid(), runnableList);
         try {
-            if(isPause){
+            if (isPause) {
                 L.e("准备线程 启动下载任务时为暂停状态 所以不从map中删除");
-            }else{
+            } else {
                 L.e("准备线程 启动下载任务时不是暂停状态 从map中删除");
                 connectionMap.remove(tid);
             }
-            if(isPause){
+            if (isPause) {
                 L.w("准备线程给 启动下载任务 前暂停");
                 return;
             }
