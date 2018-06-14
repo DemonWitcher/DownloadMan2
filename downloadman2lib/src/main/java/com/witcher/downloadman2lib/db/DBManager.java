@@ -80,6 +80,7 @@ public class DBManager {
             for (Range range : rangeList) {
                 current = range.getCurrent() + current;
             }
+            task.setRanges(rangeList);
             task.setCurrent(current);
             return task;
         } else {
