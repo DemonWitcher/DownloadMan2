@@ -43,7 +43,7 @@ public class DownloadManager {
     }
 
     public void onDestroy() {
-        executor.shutdown();
+//        executor.shutdown();
         dbManager.close();
     }
 
@@ -102,6 +102,9 @@ public class DownloadManager {
         /*
             如果已经完成了一个线程 然后暂停再开始 就只有2个下载任务再执行 此时再点暂停 回调的数据就会缺失那个
             已经完成了的任务
+         */
+        /*
+            据观察 B站是异步的暂停 = = 我也改成异步的吧
          */
     }
 
