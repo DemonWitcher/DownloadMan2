@@ -118,24 +118,13 @@ public class DownloadManager {
         if (checkIsCompleted(tid)) {
             return;
         }
-        //暂停中的时候不可以再暂停
+        //暂停中的时候不可以再暂停  用一个暂停控制所有
         FirstConnection firstConnection = connectionMap.get(tid);
         if (firstConnection != null) {
             if(firstConnection.isPause){
                 L.e("tid:"+tid+"  连接任务已经处于暂停状态了");
             }else{
                 firstConnection.pause();
-            }
-        } else {
-            List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
-            if (downloadRunnableList != null) {
-                for (DownloadRunnable downloadRunnable : downloadRunnableList) {
-                    if(downloadRunnable.isPause){
-                        L.e("tid:"+tid+"  下载任务已经处于暂停状态了");
-                    }else{
-                        downloadRunnable.pause();
-                    }
-                }
             }
         }
     }

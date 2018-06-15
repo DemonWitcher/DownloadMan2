@@ -106,6 +106,7 @@ public class SingleTaskActivity extends AppCompatActivity implements View.OnClic
             }
             break;
             case R.id.bt_pause: {
+                mTvState.setText("马上暂停...");
                 DownloadMan.pause(tid);
             }
             break;
