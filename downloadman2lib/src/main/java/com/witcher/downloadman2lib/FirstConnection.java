@@ -27,7 +27,7 @@ public class FirstConnection implements Runnable {
     private int tid;
     private Task task;
     private volatile long length;
-    private volatile boolean isPause;
+    public volatile boolean isPause;
     private API api;
     private ThreadPoolExecutor executor;
     private DBManager dbManager;
@@ -135,12 +135,42 @@ public class FirstConnection implements Runnable {
         } finally {
             L.e("准备线程运行结束 isPause:" + isPause);
             //这里判断状态 完成 暂停 还是错误
+            connectionMap.remove(tid);
             if (isPause) {
-
+                //这里给出暂停回调和进度
+                long[] totalAndCurrent = getTotalAndCurrent();
+                callbackPause(totalAndCurrent[1], totalAndCurrent[0]);
             } else {
                 //准备线程不是暂停状态  检测工作线程状态
                 checkResult();
             }
+        }
+    }
+
+    private void callbackPause(long current, long total) {
+        MessageSnapshot.PauseMessageSnapshot pauseMessageSnapshot =
+                new MessageSnapshot.PauseMessageSnapshot(tid, MessageType.PAUSE, total, current);
+        try {
+            for (IDownloadCallback downloadCallback : callbackList) {
+                L.w("给出暂停回调");
+                downloadCallback.callback(pauseMessageSnapshot);
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void callbackCompleted() {
+        MessageSnapshot.CompleteMessageSnapshot completeMessageSnapshot =
+                new MessageSnapshot.CompleteMessageSnapshot(task.getTid(), MessageType.COMPLETED,
+                        task.getTotal());
+        try {
+            for (IDownloadCallback downloadCallback : callbackList) {
+                L.w("tid:" + tid + "  给出完成回调");
+                downloadCallback.callback(completeMessageSnapshot);
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
         }
     }
 
@@ -149,7 +179,7 @@ public class FirstConnection implements Runnable {
         boolean pause = true;
         boolean completed = true;
         List<DownloadRunnable> runnableList = downloadMap.get(tid);
-        if(runnableList == null){
+        if (runnableList == null) {
             return;
         }
         for (DownloadRunnable downloadRunnable : runnableList) {
@@ -160,27 +190,25 @@ public class FirstConnection implements Runnable {
                 completed = false;
             }
         }
+        downloadMap.remove(tid);
         if (pause) {
-            L.e("准备线程 完成后 所有下载线程为暂停状态 不删除任务map");
-        }else{
-            L.e("准备线程 完成后 所有下载线程不为暂停状态 删除任务map");
-            downloadMap.remove(tid);
-        }
-
-        if (completed) {
-            downloadMap.remove(tid);
-            task.setCurrent(task.getTotal());
-            dbManager.updateTask(task);
-            MessageSnapshot.CompleteMessageSnapshot completeMessageSnapshot =
-                    new MessageSnapshot.CompleteMessageSnapshot(task.getTid(), MessageType.COMPLETED,
-                            task.getTotal());
-            try {
-                for (IDownloadCallback downloadCallback : callbackList) {
-                    L.w("tid:" + tid + "  给出完成回调");
-                    downloadCallback.callback(completeMessageSnapshot);
-                }
-            } catch (RemoteException e) {
-                e.printStackTrace();
+            L.e("准备线程 完成后 所有下载线程为暂停状态");
+            long current;
+            long total = task.getTotal();
+            Task task = dbManager.selTask(tid);
+            if (task != null) {
+                current = task.getCurrent();
+            } else {
+                L.e("库里缺失下载中的任务 返回了min_value作为current和total");
+                current = Integer.MIN_VALUE;
+            }
+            callbackPause(current, total);
+        } else {
+            L.e("准备线程 完成后 所有下载线程不为暂停状态");
+            if (completed) {
+                task.setCurrent(task.getTotal());
+                dbManager.updateTask(task);
+                callbackCompleted();
             }
         }
     }

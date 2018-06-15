@@ -1,5 +1,6 @@
 package com.witcher.downloadman2;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
@@ -85,6 +86,13 @@ public class SingleTaskActivity extends AppCompatActivity implements View.OnClic
 
         mBtDeleteAllDB = findViewById(R.id.bt_db_delete);
         mBtDeleteAllDB.setOnClickListener(this);
+
+        findViewById(R.id.bt_to_mix).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(SingleTaskActivity.this,MainActivity.class));
+            }
+        });
     }
 
     @Override

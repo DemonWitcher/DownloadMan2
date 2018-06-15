@@ -49,7 +49,7 @@ public class DownloadManager {
 
     public void start(String url, String path) {
         int tid = Util.generateId(url, path);
-        if(checkIsCompleted(tid)){
+        if (checkIsCompleted(tid)) {
             return;
         }
         //已经完成了的 就不参与暂停和开始了
@@ -105,75 +105,38 @@ public class DownloadManager {
          */
         /*
             据观察 B站是异步的暂停 = = 我也改成异步的吧
+            假如改成异步的 ,我开了下载 然后暂停 暂停回调触发前 我又开下载 然后触发了新下载连接中回调
+            然后又触发了老下载暂停回调 怎么算
+            给暂停回调之前判断一下是否有新下载产生 就是map里面有没有这个任务 有就不给回调了
+            OR 或者 处于暂停中的状态时 不允许再开新下载
+            应该UI也给控制 点了暂停 暂停完成前 就不应该允许他进行继续下载的操作 保持一个马上暂停的状态 像B站一样
+
          */
     }
 
     public void pause(int tid) {
-        if(checkIsCompleted(tid)){
+        if (checkIsCompleted(tid)) {
             return;
         }
-        try {
-            long current = 0;
-            long total = 0;
-            FirstConnection firstConnection = connectionMap.get(tid);
-            if (firstConnection != null) {
-                connectionMap.remove(tid);
-                firstConnection.pause();//下载线程暂停了 给内存里的数据 准备线程暂停了 给数据库里的数据
-                long[] totalAndCurrent = firstConnection.getTotalAndCurrent();
-                total = totalAndCurrent[0];
-                current = totalAndCurrent[1];
-            } else {
-                List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
-                if (downloadRunnableList != null) {
-                    downloadMap.remove(tid);
-                    for (DownloadRunnable downloadRunnable : downloadRunnableList) {
+        //暂停中的时候不可以再暂停
+        FirstConnection firstConnection = connectionMap.get(tid);
+        if (firstConnection != null) {
+            if(firstConnection.isPause){
+                L.e("tid:"+tid+"  连接任务已经处于暂停状态了");
+            }else{
+                firstConnection.pause();
+            }
+        } else {
+            List<DownloadRunnable> downloadRunnableList = downloadMap.get(tid);
+            if (downloadRunnableList != null) {
+                for (DownloadRunnable downloadRunnable : downloadRunnableList) {
+                    if(downloadRunnable.isPause){
+                        L.e("tid:"+tid+"  下载任务已经处于暂停状态了");
+                    }else{
                         downloadRunnable.pause();
-                        //在快速响应暂停和暂停时回调最新进度之间 如何取舍
-                        //这里怎么能尽可能拿到最新的呢  内存里有的range 拿内存 完成了的range 拿数据库
-                        //downloadRunnableList 比库里少的range 去库里拿进度
-                    }
-                    Task task = dbManager.selTask(tid);
-                    if (task != null) {
-                        for (Range range : task.getRanges()) {
-                            boolean isContains = false;
-                            for (DownloadRunnable downloadRunnable : downloadRunnableList) {
-                                if (downloadRunnable.getRange().getIdkey().equals(range.getIdkey())) {
-                                    current = current + downloadRunnable.getRange().getCurrent();
-                                    isContains = true;
-                                    break;
-                                }
-                            }
-                            if (!isContains) {
-                                current = current + range.getCurrent();
-                            }
-                        }
-                        total = task.getTotal();
-                    } else {
-                        L.e("库里缺失下载中的任务 返回了min_value作为current和total");
-                        current = Integer.MIN_VALUE;
-                        total = Integer.MIN_VALUE;
-                    }
-                } else {//内存里没有这个任务 用户连续点了多次暂停就会走到这里 从数据库里读一下进度给用户吧
-                    L.e("读不到任务组 被删除了");
-                    Task task = dbManager.selTask(tid);
-                    if (task != null) {
-                        current = task.getCurrent();
-                        total = task.getTotal();
-                    } else {
-                        L.e("暂停时库里和内存中都没任务 返回了min_value作为current和total");
-                        current = Integer.MIN_VALUE;
-                        total = Integer.MIN_VALUE;
                     }
                 }
             }
-            MessageSnapshot.PauseMessageSnapshot pauseMessageSnapshot =
-                    new MessageSnapshot.PauseMessageSnapshot(tid, MessageType.PAUSE, total, current);
-            for (IDownloadCallback downloadCallback : callbackList) {
-                L.w("给出暂停回调");
-                downloadCallback.callback(pauseMessageSnapshot);
-            }
-        } catch (RemoteException e) {
-            e.printStackTrace();
         }
     }
 

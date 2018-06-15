@@ -5,12 +5,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical">
     <LinearLayout
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
         <Button
             android:text="删除全部数据库数据"
             android:id="@+id/bt_db_delete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <Button
+            android:text="跳转多任务"
+            android:id="@+id/bt_to_mix"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
     </LinearLayout>

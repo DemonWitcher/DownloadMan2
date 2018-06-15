@@ -121,7 +121,7 @@ public class DownloadRunnable implements Runnable {
 //                L.i("写入了一次 rid:"+range.getIdkey()+"progress:"+range.getCurrent());
                 if (isPause) {
                     outputStream.flush();
-                    range.setCurrent(range.getCurrent() - byteCount);
+                    range.setCurrent(range.getCurrent()/* - byteCount*/);
                     dbManager.updateRange(range);//暂停回调给完后 下载线程还能再写入一次数据
                     break;
                 }
