@@ -31,8 +31,8 @@ public class DownloadRunnable implements Runnable {
     private DBManager dbManager;
     private List<IDownloadCallback> callbackList;
 
-    public DownloadRunnable(Range range, Task task, DBManager dbManager, List<IDownloadCallback> callbackList
-            ) {
+    public DownloadRunnable(Range range, Task task, DBManager dbManager,
+                            List<IDownloadCallback> callbackList) {
         this.range = range;
         this.task = task;
         api = RetrofitProvider.getInstance().create(API.class);

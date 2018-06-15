@@ -46,7 +46,6 @@ public class FirstConnection implements Runnable {
         this.downloadMap = downloadMap;
         this.callbackList = callbackList;
         this.connectionMap = connectionMap;
-        //最好对外提供task的total和current
     }
 
     public void pause() {
