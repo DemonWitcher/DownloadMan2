@@ -22,14 +22,14 @@ public class DownloadMan {
      */
     public static void init(Context context) {
         DownloadMan.context = context;
-        if(Util.isAppMainProcess(context)){
-            if (serviceBinder == null) {
-                serviceBinder = new ServiceBinder();
-            }
-            if (!serviceBinder.isBind()) {
-                serviceBinder.bindService();
-            }
-        }
+//        if(Util.isAppMainProcess(context)){
+//            if (serviceBinder == null) {
+//                serviceBinder = new ServiceBinder();
+//            }
+//            if (!serviceBinder.isBind()) {
+//                serviceBinder.bindService();
+//            }
+//        }
     }
 
     public static Context getContext() {
@@ -37,6 +37,7 @@ public class DownloadMan {
     }
 
     public static int start(String url, String path, DownloadListener downloadListener) {
+        checkServiceBinder();
         if (TextUtils.isEmpty(url) || TextUtils.isEmpty(path) || downloadListener == null) {
             throw new IllegalArgumentException("url == null || path == null || downloadListener == null");
         }
@@ -53,29 +54,48 @@ public class DownloadMan {
             }
         }
         int tid = Util.generateId(url, path);
-        if(serviceBinder!=null){
-            serviceBinder.start(tid,url,path,downloadListener);
+        if (serviceBinder != null) {
+            if (serviceBinder.isBind()) {
+                serviceBinder.start(tid, url, path, downloadListener);
+            } else {
+                if (serviceBinder.isBinding()) {
+                    L.i("已经处于加载下载进程中");
+                    serviceBinder.addWaitingTask(new WaitingTask(url, path, tid, downloadListener));
+                } else {
+                    L.i("开始加载下载进程");
+                    serviceBinder.bindService(tid, url, path, downloadListener);
+                }
+            }
         }
         L.i("tid:" + tid);
         return tid;
     }
 
     public static void pause(int tid) {
-        if(serviceBinder!=null){
+        checkServiceBinder();
+        if (serviceBinder != null) {
             serviceBinder.pause(tid);
         }
     }
 
     public static void delete(int tid) {
-        if(serviceBinder!=null){
+        checkServiceBinder();
+        if (serviceBinder != null) {
             serviceBinder.delete(tid);
         }
     }
 
     public static Task selAllTask() {
-        if(serviceBinder!=null){
+        checkServiceBinder();
+        if (serviceBinder != null) {
 //            serviceBinder.delete(tid);
         }
         return null;
+    }
+
+    private static void checkServiceBinder() {
+        if (serviceBinder == null) {
+            serviceBinder = new ServiceBinder();
+        }
     }
 }
